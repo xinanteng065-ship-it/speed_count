@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>競技縄跳びカウンター</title>
     <style>
         * {
@@ -15,68 +15,60 @@
             font-family: 'Arial', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
             color: white;
+            overflow-x: hidden;
         }
         
         .container {
             width: 100%;
-            max-width: 600px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            padding: 15px;
         }
         
         h1 {
             text-align: center;
-            margin-bottom: 30px;
-            font-size: 28px;
+            margin-bottom: 20px;
+            font-size: 22px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
         
         .step {
             background: rgba(255, 255, 255, 0.15);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
         }
         
         .step-number {
             display: inline-block;
             background: rgba(255, 255, 255, 0.3);
-            width: 30px;
-            height: 30px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             text-align: center;
-            line-height: 30px;
+            line-height: 26px;
             font-weight: bold;
-            margin-right: 10px;
+            margin-right: 8px;
+            font-size: 14px;
         }
         
         .step-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
         
         .audio-upload {
             background: rgba(255, 255, 255, 0.1);
             border: 2px dashed rgba(255, 255, 255, 0.4);
             border-radius: 10px;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         
-        .audio-upload:hover {
+        .audio-upload:active {
             background: rgba(255, 255, 255, 0.2);
-            border-color: rgba(255, 255, 255, 0.6);
         }
         
         .audio-upload input[type="file"] {
@@ -84,26 +76,30 @@
         }
         
         .upload-icon {
-            font-size: 40px;
-            margin-bottom: 10px;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        .upload-text {
+            font-size: 14px;
         }
         
         .file-name {
-            margin-top: 10px;
-            font-size: 14px;
+            margin-top: 8px;
+            font-size: 13px;
             opacity: 0.9;
         }
         
         .timer-display {
             background: rgba(255, 255, 255, 0.2);
-            border-radius: 15px;
-            padding: 30px;
+            border-radius: 12px;
+            padding: 20px;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         
         .timer-value {
-            font-size: 64px;
+            font-size: 48px;
             font-weight: bold;
             text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
             font-variant-numeric: tabular-nums;
@@ -121,10 +117,10 @@
         
         .counter-display {
             background: rgba(255, 255, 255, 0.2);
-            border-radius: 15px;
-            padding: 30px;
+            border-radius: 12px;
+            padding: 20px;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             transition: transform 0.2s ease;
         }
         
@@ -133,13 +129,13 @@
         }
         
         .counter-label {
-            font-size: 18px;
-            margin-bottom: 10px;
+            font-size: 16px;
+            margin-bottom: 8px;
             opacity: 0.9;
         }
         
         .counter-value {
-            font-size: 72px;
+            font-size: 56px;
             font-weight: bold;
             text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
         }
@@ -147,8 +143,9 @@
         .video-container {
             position: relative;
             width: 100%;
-            margin-bottom: 20px;
-            border-radius: 15px;
+            max-height: 300px;
+            margin-bottom: 15px;
+            border-radius: 12px;
             overflow: hidden;
             background: black;
         }
@@ -170,15 +167,15 @@
         
         .big-button {
             width: 100%;
-            padding: 20px;
-            font-size: 20px;
+            padding: 16px;
+            font-size: 18px;
             font-weight: bold;
             border: none;
-            border-radius: 15px;
+            border-radius: 12px;
             cursor: pointer;
             transition: all 0.3s ease;
             color: white;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
         
         .start-btn {
@@ -186,9 +183,8 @@
             box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
         }
         
-        .start-btn:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(17, 153, 142, 0.6);
+        .start-btn:active:not(:disabled) {
+            transform: scale(0.98);
         }
         
         .stop-btn {
@@ -196,9 +192,8 @@
             box-shadow: 0 4px 15px rgba(235, 51, 73, 0.4);
         }
         
-        .stop-btn:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(235, 51, 73, 0.6);
+        .stop-btn:active:not(:disabled) {
+            transform: scale(0.98);
         }
         
         .reset-btn {
@@ -206,31 +201,29 @@
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
         
-        .reset-btn:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        .reset-btn:active:not(:disabled) {
+            transform: scale(0.98);
         }
         
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-            transform: none !important;
         }
         
         .status {
             text-align: center;
-            padding: 15px;
+            padding: 12px;
             background: rgba(255, 255, 255, 0.15);
             border-radius: 10px;
-            font-size: 16px;
-            margin-top: 20px;
+            font-size: 14px;
+            margin-top: 15px;
         }
         
         .results {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             border-radius: 15px;
-            padding: 30px;
-            margin-top: 20px;
+            padding: 25px;
+            margin-top: 15px;
             display: none;
             text-align: center;
         }
@@ -240,14 +233,14 @@
         }
         
         .results h2 {
-            font-size: 28px;
-            margin-bottom: 20px;
+            font-size: 24px;
+            margin-bottom: 15px;
         }
         
         .result-value {
-            font-size: 80px;
+            font-size: 64px;
             font-weight: bold;
-            margin: 20px 0;
+            margin: 15px 0;
             text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
         }
         
@@ -273,8 +266,8 @@
             </div>
             <label class="audio-upload" for="audioFile">
                 <div class="upload-icon">🎵</div>
-                <div>タップして音源ファイルを選択</div>
-                <div class="file-name" id="fileName">ファイルが選択されていません</div>
+                <div class="upload-text">タップして音源を選択</div>
+                <div class="file-name" id="fileName">未選択</div>
                 <input type="file" id="audioFile" accept="audio/*">
             </label>
         </div>
@@ -283,14 +276,14 @@
         <div class="step">
             <div class="step-title">
                 <span class="step-number">2</span>
-                カメラで全身が映るように立つ
+                全身が映るように立つ
             </div>
             <div class="video-container">
-                <video id="video" autoplay playsinline></video>
+                <video id="video" autoplay playsinline muted></video>
                 <canvas id="canvas"></canvas>
             </div>
             <div class="status" id="cameraStatus">
-                <div class="loading">カメラとAIモデルを準備中...</div>
+                <div class="loading">準備中...</div>
             </div>
         </div>
         
@@ -298,7 +291,7 @@
         <div class="step hidden" id="step3">
             <div class="step-title">
                 <span class="step-number">3</span>
-                スタートボタンを押して計測開始！
+                スタートで計測開始！
             </div>
             
             <div class="timer-display">
@@ -324,7 +317,7 @@
         <div class="results" id="results">
             <h2>🎉 計測完了！</h2>
             <div class="result-value" id="finalCount">0</div>
-            <div style="font-size: 24px;">回</div>
+            <div style="font-size: 20px;">回</div>
         </div>
     </div>
 
@@ -345,7 +338,7 @@
         let lastRightAnkleY = null;
         let lastLeftAnkleY = null;
         let rightFootWasUp = false;
-        let minHeightThreshold = 0;
+        let detectionRunning = false;
         
         let timerInterval = null;
         let startTime = null;
@@ -438,7 +431,7 @@
         // Pose Detectionの初期化
         async function initPoseDetection() {
             try {
-                cameraStatus.innerHTML = '<div class="loading">AIモデルを読み込んでいます...</div>';
+                cameraStatus.innerHTML = '<div class="loading">AIモデル読み込み中...</div>';
                 
                 await tf.ready();
                 
@@ -447,11 +440,11 @@
                     modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
                 });
                 
-                cameraStatus.textContent = '✅ 準備完了！右足の骨格が緑色で表示されます';
+                cameraStatus.textContent = '✅ 準備OK！緑=右足';
                 return true;
             } catch (error) {
                 console.error('Pose Detection初期化エラー:', error);
-                cameraStatus.textContent = '❌ AIモデルの読み込みに失敗しました';
+                cameraStatus.textContent = '❌ 読み込み失敗';
                 return false;
             }
         }
@@ -466,26 +459,30 @@
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { 
                         facingMode: 'user',
-                        width: 640,
-                        height: 480
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
                     },
                     audio: false
                 });
                 video.srcObject = stream;
                 
-                video.addEventListener('loadedmetadata', async () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    
-                    const success = await initPoseDetection();
-                });
+                await video.play();
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                const success = await initPoseDetection();
+                if (success) {
+                    detectionRunning = true;
+                    detectPose();
+                }
             } catch (error) {
-                cameraStatus.textContent = '❌ カメラの起動に失敗しました';
+                cameraStatus.textContent = '❌ カメラ起動失敗';
                 console.error(error);
             }
         }
         
-        // 右足着地検知（片足ずつ）
+        // 右足着地検知
         function detectRightFootLanding(poses) {
             if (!poses || poses.length === 0) return;
             
@@ -494,27 +491,21 @@
             
             const rightAnkle = keypoints.find(kp => kp.name === 'right_ankle');
             const leftAnkle = keypoints.find(kp => kp.name === 'left_ankle');
-            const rightKnee = keypoints.find(kp => kp.name === 'right_knee');
             
-            if (!rightAnkle || rightAnkle.score < 0.3) return;
-            if (!leftAnkle || leftAnkle.score < 0.3) return;
+            if (!rightAnkle || rightAnkle.score < 0.25) return;
+            if (!leftAnkle || leftAnkle.score < 0.25) return;
             
             const rightY = rightAnkle.y;
             const leftY = leftAnkle.y;
             
-            // 初回の基準高さを設定
-            if (minHeightThreshold === 0 && rightKnee && rightKnee.score > 0.3) {
-                minHeightThreshold = rightKnee.y;
-            }
-            
             if (lastRightAnkleY !== null && lastLeftAnkleY !== null) {
-                // 右足が上がっている状態を検知
-                if (rightY < leftY - 30) {
+                // 右足が上がっている
+                if (rightY < leftY - 25) {
                     rightFootWasUp = true;
                 }
                 
-                // 右足が下がって着地（かつ左足より下にある）
-                if (rightFootWasUp && rightY > lastRightAnkleY + 8 && rightY > leftY + 20) {
+                // 右足が着地
+                if (rightFootWasUp && rightY > lastRightAnkleY + 6 && rightY > leftY + 15) {
                     rightFootWasUp = false;
                     counter++;
                     counterValue.textContent = counter;
@@ -539,7 +530,6 @@
             const pose = poses[0];
             const keypoints = pose.keypoints;
             
-            // 右足の骨格のみ描画
             const rightLeg = [
                 keypoints.find(kp => kp.name === 'right_hip'),
                 keypoints.find(kp => kp.name === 'right_knee'),
@@ -547,22 +537,23 @@
             ];
             
             ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 3;
+            
             for (let i = 0; i < rightLeg.length - 1; i++) {
                 if (rightLeg[i] && rightLeg[i + 1] && 
-                    rightLeg[i].score > 0.3 && rightLeg[i + 1].score > 0.3) {
+                    rightLeg[i].score > 0.25 && rightLeg[i + 1].score > 0.25) {
                     ctx.beginPath();
                     ctx.moveTo(rightLeg[i].x, rightLeg[i].y);
                     ctx.lineTo(rightLeg[i + 1].x, rightLeg[i + 1].y);
                     ctx.stroke();
                 }
-            };
+            }
             
             rightLeg.forEach(kp => {
-                if (kp && kp.score > 0.3) {
+                if (kp && kp.score > 0.25) {
                     ctx.fillStyle = kp.name === 'right_ankle' ? '#ff0000' : '#00ff00';
                     ctx.beginPath();
-                    ctx.arc(kp.x, kp.y, 6, 0, 2 * Math.PI);
+                    ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
                     ctx.fill();
                 }
             });
@@ -570,7 +561,7 @@
         
         // ポーズ検出ループ
         async function detectPose() {
-            if (!detector) return;
+            if (!detectionRunning || !detector) return;
             
             try {
                 const poses = await detector.estimatePoses(video);
@@ -580,7 +571,7 @@
                     detectRightFootLanding(poses);
                 }
             } catch (error) {
-                console.error('Pose detection error:', error);
+                console.error('検出エラー:', error);
             }
             
             requestAnimationFrame(detectPose);
@@ -601,7 +592,6 @@
             lastRightAnkleY = null;
             lastLeftAnkleY = null;
             rightFootWasUp = false;
-            minHeightThreshold = 0;
             
             audioPlayer.currentTime = 0;
             audioPlayer.play();
@@ -622,13 +612,11 @@
             lastRightAnkleY = null;
             lastLeftAnkleY = null;
             rightFootWasUp = false;
-            minHeightThreshold = 0;
             results.classList.remove('show');
         });
         
         // 初期化
         initCamera();
-        detectPose();
     </script>
 </body>
 </html>
