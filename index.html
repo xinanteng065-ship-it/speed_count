@@ -205,6 +205,15 @@
             transform: scale(0.98);
         }
         
+        .download-btn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
+        }
+        
+        .download-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+        
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -252,6 +261,14 @@
         .hidden {
             display: none;
         }
+        
+        .processing {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -293,11 +310,7 @@
                 <span class="step-number">3</span>
                 スタートで計測開始！
             </div>
-            
-            <div class="timer-display">
-                <div class="timer-value" id="timer">--:--</div>
-            </div>
-            
+
             <div class="counter-display" id="counterDisplay">
                 <div class="counter-label">右足着地回数</div>
                 <div class="counter-value" id="counter">0</div>
@@ -317,7 +330,13 @@
         <div class="results" id="results">
             <h2>🎉 計測完了！</h2>
             <div class="result-value" id="finalCount">0</div>
-            <div style="font-size: 20px;">回</div>
+            <div style="font-size: 20px; margin-bottom: 20px;">回</div>
+            <button class="big-button download-btn" id="downloadBtn">
+                📹 動画をダウンロード
+            </button>
+            <div class="processing hidden" id="processing">
+                動画を作成中...
+            </div>
         </div>
     </div>
 
@@ -325,6 +344,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 
     <script>
         let video, canvas, ctx;
@@ -334,6 +354,7 @@
         let audioPlayer = document.getElementById('audioPlayer');
         let audioLoaded = false;
         let audioDuration = 0;
+        let audioBlob = null;
         
         let lastRightAnkleY = null;
         let lastLeftAnkleY = null;
@@ -344,9 +365,13 @@
         let startTime = null;
         let timeRemaining = 0;
         
+        // 録画用
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let videoBlob = null;
+        
         const counterDisplay = document.getElementById('counterDisplay');
         const counterValue = document.getElementById('counter');
-        const timerValue = document.getElementById('timer');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
         const resetBtn = document.getElementById('resetBtn');
@@ -356,9 +381,11 @@
         const step3 = document.getElementById('step3');
         const results = document.getElementById('results');
         const finalCount = document.getElementById('finalCount');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const processing = document.getElementById('processing');
         
         // 音声ファイル読み込み
-        audioFile.addEventListener('change', (e) => {
+        audioFile.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (file) {
                 fileName.textContent = file.name;
@@ -366,60 +393,27 @@
                 audioPlayer.src = url;
                 audioLoaded = true;
                 
+                // Blobとして保存
+                audioBlob = file;
+                
                 audioPlayer.addEventListener('loadedmetadata', () => {
                     audioDuration = Math.floor(audioPlayer.duration);
                     timeRemaining = audioDuration;
-                    updateTimerDisplay();
                     step3.classList.remove('hidden');
                 });
             }
         });
         
-        // タイマー表示更新
-        function updateTimerDisplay() {
-            const minutes = Math.floor(timeRemaining / 60);
-            const seconds = timeRemaining % 60;
-            timerValue.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            
-            timerValue.classList.remove('danger');
-            if (timeRemaining <= 5) {
-                timerValue.classList.add('danger');
-            }
-        }
-        
-        // タイマー開始
-        function startTimer() {
-            startTime = Date.now();
-            const duration = audioDuration;
-            
-            timerInterval = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                timeRemaining = duration - elapsed;
-                
-                if (timeRemaining <= 0) {
-                    timeRemaining = 0;
-                    updateTimerDisplay();
-                    endCounting();
-                } else {
-                    updateTimerDisplay();
-                }
-            }, 100);
-        }
-        
-        // タイマー停止
-        function stopTimer() {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-        }
-        
         // カウント終了
         function endCounting() {
             counting = false;
-            stopTimer();
             audioPlayer.pause();
             audioPlayer.currentTime = 0;
+            
+            // 録画停止
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
             
             startBtn.classList.remove('hidden');
             stopBtn.classList.add('hidden');
@@ -431,20 +425,14 @@
         // Pose Detectionの初期化
         async function initPoseDetection() {
             try {
-                cameraStatus.innerHTML = '<div class="loading">AIモデル読み込み中...</div>';
-                
                 await tf.ready();
                 
                 const model = poseDetection.SupportedModels.MoveNet;
                 detector = await poseDetection.createDetector(model, {
                     modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
                 });
-                
-                cameraStatus.textContent = '✅ 準備OK！緑=右足';
                 return true;
             } catch (error) {
-                console.error('Pose Detection初期化エラー:', error);
-                cameraStatus.textContent = '❌ 読み込み失敗';
                 return false;
             }
         }
@@ -475,11 +463,37 @@
                 if (success) {
                     detectionRunning = true;
                     detectPose();
+                    cameraStatus.textContent = '✅ 準備OK！';
                 }
             } catch (error) {
                 cameraStatus.textContent = '❌ カメラ起動失敗';
                 console.error(error);
             }
+        }
+        
+        // 録画開始
+        function startRecording() {
+            recordedChunks = [];
+            
+            // canvasからストリームを取得
+            const canvasStream = canvas.captureStream(30);
+            
+            mediaRecorder = new MediaRecorder(canvasStream, {
+                mimeType: 'video/webm;codecs=vp9',
+                videoBitsPerSecond: 2500000
+            });
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            
+            mediaRecorder.onstop = () => {
+                videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+            };
+            
+            mediaRecorder.start();
         }
         
         // 右足着地検知
@@ -499,12 +513,10 @@
             const leftY = leftAnkle.y;
             
             if (lastRightAnkleY !== null && lastLeftAnkleY !== null) {
-                // 右足が上がっている
                 if (rightY < leftY - 25) {
                     rightFootWasUp = true;
                 }
                 
-                // 右足が着地
                 if (rightFootWasUp && rightY > lastRightAnkleY + 6 && rightY > leftY + 15) {
                     rightFootWasUp = false;
                     counter++;
@@ -525,6 +537,12 @@
         function drawPose(poses) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            // ビデオを描画
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+            ctx.restore();
+            
             if (!poses || poses.length === 0) return;
             
             const pose = poses[0];
@@ -535,6 +553,10 @@
                 keypoints.find(kp => kp.name === 'right_knee'),
                 keypoints.find(kp => kp.name === 'right_ankle')
             ];
+            
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.translate(-canvas.width, 0);
             
             ctx.strokeStyle = '#00ff00';
             ctx.lineWidth = 3;
@@ -557,6 +579,8 @@
                     ctx.fill();
                 }
             });
+            
+            ctx.restore();
         }
         
         // ポーズ検出ループ
@@ -569,6 +593,12 @@
                 
                 if (counting) {
                     detectRightFootLanding(poses);
+                    
+                    // タイマー確認
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    if (elapsed >= audioDuration) {
+                        endCounting();
+                    }
                 }
             } catch (error) {
                 console.error('検出エラー:', error);
@@ -593,9 +623,12 @@
             lastLeftAnkleY = null;
             rightFootWasUp = false;
             
+            startTime = Date.now();
+            
             audioPlayer.currentTime = 0;
             audioPlayer.play();
-            startTimer();
+            
+            startRecording();
         });
         
         // ストップ
@@ -607,12 +640,32 @@
         resetBtn.addEventListener('click', () => {
             counter = 0;
             counterValue.textContent = '0';
-            timeRemaining = audioDuration;
-            updateTimerDisplay();
             lastRightAnkleY = null;
             lastLeftAnkleY = null;
             rightFootWasUp = false;
             results.classList.remove('show');
+            videoBlob = null;
+        });
+        
+        // 動画ダウンロード（音声なし版）
+        downloadBtn.addEventListener('click', () => {
+            if (!videoBlob) {
+                alert('動画が録画されていません');
+                return;
+            }
+            
+            processing.classList.remove('hidden');
+            
+            // 簡易版：音声合成なしでダウンロード
+            const url = URL.createObjectURL(videoBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `jump_counter_${Date.now()}.webm`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            processing.classList.add('hidden');
+            alert('動画をダウンロードしました！（注：音声なし版）');
         });
         
         // 初期化
