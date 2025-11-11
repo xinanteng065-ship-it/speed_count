@@ -2,8 +2,10 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>競技縄跳びカウンター</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Jump Coach</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <style>
         * {
             margin: 0;
@@ -15,145 +17,71 @@
             font-family: 'Arial', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            color: white;
-            overflow-x: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
         }
         
         .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 900px;
             width: 100%;
-            padding: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         
         h1 {
             text-align: center;
-            margin-bottom: 20px;
-            font-size: 22px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 2.5em;
         }
         
-        .step {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
+        .mode-selector {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .mode-btn {
+            flex: 1;
             padding: 15px;
-            margin-bottom: 15px;
-        }
-        
-        .step-number {
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.3);
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            text-align: center;
-            line-height: 26px;
-            font-weight: bold;
-            margin-right: 8px;
-            font-size: 14px;
-        }
-        
-        .step-title {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 12px;
-        }
-        
-        .audio-upload {
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px dashed rgba(255, 255, 255, 0.4);
+            border: 3px solid #667eea;
+            background: white;
             border-radius: 10px;
-            padding: 15px;
-            text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .audio-upload:active {
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        .audio-upload input[type="file"] {
-            display: none;
-        }
-        
-        .upload-icon {
-            font-size: 32px;
-            margin-bottom: 8px;
-        }
-        
-        .upload-text {
-            font-size: 14px;
-        }
-        
-        .file-name {
-            margin-top: 8px;
-            font-size: 13px;
-            opacity: 0.9;
-        }
-        
-        .timer-display {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        
-        .timer-value {
-            font-size: 48px;
+            font-size: 1.1em;
             font-weight: bold;
-            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
-            font-variant-numeric: tabular-nums;
+            color: #667eea;
+            transition: all 0.3s;
         }
         
-        .timer-value.danger {
-            color: #ff5252;
-            animation: blink 0.5s infinite;
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
         }
         
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .counter-display {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 15px;
-            transition: transform 0.2s ease;
-        }
-        
-        .counter-display.pulse {
-            transform: scale(1.05);
-        }
-        
-        .counter-label {
-            font-size: 16px;
-            margin-bottom: 8px;
-            opacity: 0.9;
-        }
-        
-        .counter-value {
-            font-size: 56px;
-            font-weight: bold;
-            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+        .mode-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.3);
         }
         
         .video-container {
             position: relative;
             width: 100%;
-            max-height: 300px;
-            margin-bottom: 15px;
-            border-radius: 12px;
+            max-width: 640px;
+            margin: 0 auto 20px;
+            border-radius: 10px;
             overflow: hidden;
-            background: black;
+            background: #000;
         }
         
         #video {
             width: 100%;
+            height: auto;
             display: block;
-            transform: scaleX(-1);
         }
         
         #canvas {
@@ -162,79 +90,95 @@
             left: 0;
             width: 100%;
             height: 100%;
-            transform: scaleX(-1);
         }
         
-        .big-button {
-            width: 100%;
-            padding: 16px;
-            font-size: 18px;
+        .display-area {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .jump-count {
+            font-size: 5em;
             font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+            transition: transform 0.1s;
+        }
+        
+        .timer {
+            font-size: 2.5em;
+            color: #764ba2;
+            margin: 20px 0;
+        }
+        
+        .status {
+            font-size: 1.3em;
+            color: #666;
+            margin: 15px 0;
+            min-height: 30px;
+        }
+        
+        .voice-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #f7fafc;
+            border-radius: 10px;
+            margin: 20px auto;
+        }
+        
+        .mic-icon {
+            width: 20px;
+            height: 20px;
+            background: #48bb78;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .control-btn {
+            flex: 1;
+            padding: 20px;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
-            color: white;
-            margin-bottom: 12px;
-        }
-        
-        .start-btn {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
-        }
-        
-        .start-btn:active:not(:disabled) {
-            transform: scale(0.98);
+            transition: all 0.3s;
         }
         
         .stop-btn {
-            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
-            box-shadow: 0 4px 15px rgba(235, 51, 73, 0.4);
+            background: #f56565;
+            color: white;
         }
         
-        .stop-btn:active:not(:disabled) {
-            transform: scale(0.98);
+        .stop-btn:hover:not(:disabled) {
+            background: #e53e3e;
+            transform: translateY(-2px);
         }
         
-        .reset-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .reset-btn:active:not(:disabled) {
-            transform: scale(0.98);
-        }
-        
-        .download-btn {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
-        }
-        
-        .download-btn:active:not(:disabled) {
-            transform: scale(0.98);
-        }
-        
-        button:disabled {
+        .control-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
         
-        .status {
-            text-align: center;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 10px;
-            font-size: 14px;
-            margin-top: 15px;
-        }
-        
         .results {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            border-radius: 15px;
-            padding: 25px;
-            margin-top: 15px;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 10px;
             display: none;
-            text-align: center;
         }
         
         .results.show {
@@ -242,434 +186,680 @@
         }
         
         .results h2 {
-            font-size: 24px;
+            color: #667eea;
             margin-bottom: 15px;
         }
         
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            font-size: 1.1em;
+        }
+        
         .result-value {
-            font-size: 64px;
             font-weight: bold;
-            margin: 15px 0;
-            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+            color: #667eea;
+        }
+        
+        .countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .countdown-overlay.show {
+            display: flex;
+        }
+        
+        .countdown-number {
+            font-size: 15em;
+            font-weight: bold;
+            color: white;
+            animation: countdownPulse 1s;
+        }
+        
+        @keyframes countdownPulse {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .chart-container {
+            margin-top: 20px;
+            padding: 25px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .chart-title {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            height: 200px;
+            gap: 8px;
+            margin-top: 20px;
+            padding: 10px;
+            background: linear-gradient(to top, #f7fafc 0%, white 100%);
+            border-radius: 10px;
+            position: relative;
+        }
+        
+        .bar-chart::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e2e8f0;
+        }
+        
+        .bar {
+            flex: 1;
+            background: linear-gradient(to top, #667eea, #764ba2);
+            border-radius: 8px 8px 0 0;
+            position: relative;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 -2px 10px rgba(102, 126, 234, 0.2);
+            min-height: 20px;
+        }
+        
+        .bar:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 -5px 20px rgba(102, 126, 234, 0.4);
+            filter: brightness(1.1);
+        }
+        
+        .bar-label {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75em;
+            color: #64748b;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+        
+        .bar-value {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #667eea;
+            background: white;
+            padding: 2px 8px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 15px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        
+        .stat-unit {
+            font-size: 0.7em;
+            opacity: 0.8;
+        }
+        
+        .ai-advice {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        
+        .ai-advice h3 {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .ai-advice p {
+            line-height: 1.6;
         }
         
         .loading {
             text-align: center;
-            opacity: 0.8;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .processing {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-            text-align: center;
+            color: #667eea;
+            font-weight: bold;
+            padding: 20px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🏃‍♂️ 競技縄跳びカウンター</h1>
+        <h1>🏃‍♂️ AI Jump Coach</h1>
         
-        <!-- ステップ1: 音源アップロード -->
-        <div class="step">
-            <div class="step-title">
-                <span class="step-number">1</span>
-                音源ファイルをアップロード
-            </div>
-            <label class="audio-upload" for="audioFile">
-                <div class="upload-icon">🎵</div>
-                <div class="upload-text">タップして音源を選択</div>
-                <div class="file-name" id="fileName">未選択</div>
-                <input type="file" id="audioFile" accept="audio/*">
-            </label>
+        <div class="mode-selector">
+            <button class="mode-btn active" data-duration="30">30秒スピード</button>
+            <button class="mode-btn" data-duration="180">3分スピード</button>
         </div>
         
-        <!-- ステップ2: カメラ確認 -->
-        <div class="step">
-            <div class="step-title">
-                <span class="step-number">2</span>
-                全身が映るように立つ
-            </div>
-            <div class="video-container">
-                <video id="video" autoplay playsinline muted></video>
-                <canvas id="canvas"></canvas>
-            </div>
-            <div class="status" id="cameraStatus">
-                <div class="loading">準備中...</div>
-            </div>
+        <div class="video-container" id="videoContainer">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
         </div>
         
-        <!-- ステップ3: 計測 -->
-        <div class="step hidden" id="step3">
-            <div class="step-title">
-                <span class="step-number">3</span>
-                スタートで計測開始！
+        <div class="display-area">
+            <div class="status" id="status">
+                <div class="loading">読み込み中...</div>
             </div>
-
-            <div class="counter-display" id="counterDisplay">
-                <div class="counter-label">右足着地回数</div>
-                <div class="counter-value" id="counter">0</div>
+            <div class="voice-indicator" id="voiceIndicator" style="display: none;">
+                <div class="mic-icon"></div>
+                <span>「スタート」と言ってください</span>
             </div>
-            
-            <button class="big-button start-btn" id="startBtn">
-                🚀 スタート
-            </button>
-            <button class="big-button stop-btn hidden" id="stopBtn">
-                ⏹ ストップ
-            </button>
-            <button class="big-button reset-btn" id="resetBtn">
-                🔄 リセット
-            </button>
+            <div class="timer" id="timer">00:00</div>
+            <div class="jump-count" id="jumpCount">0</div>
+        </div>
+        
+        <div class="controls">
+            <button class="control-btn stop-btn" id="stopBtn" disabled>ストップ</button>
         </div>
         
         <div class="results" id="results">
-            <h2>🎉 計測完了！</h2>
-            <div class="result-value" id="finalCount">0</div>
-            <div style="font-size: 20px; margin-bottom: 20px;">回</div>
-            <button class="big-button download-btn" id="downloadBtn">
-                📹 動画をダウンロード
-            </button>
-            <div class="processing hidden" id="processing">
-                動画を作成中...
+            <h2>📊 結果</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">総跳躍数</div>
+                    <div class="stat-value"><span id="finalCount">0</span><span class="stat-unit">回</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">平均ペース</div>
+                    <div class="stat-value"><span id="avgPace">0.0</span><span class="stat-unit">回/秒</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">最高ペース</div>
+                    <div class="stat-value"><span id="maxPace">0</span><span class="stat-unit">回/10秒</span></div>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">📈 10秒ごとの跳躍数推移</div>
+                <div class="bar-chart" id="barChart"></div>
+            </div>
+            
+            <div class="ai-advice">
+                <h3>🤖 アドバイス</h3>
+                <p id="aiAdvice">計測を完了すると、パフォーマンス分析とアドバイスが表示されます。</p>
             </div>
         </div>
     </div>
-
-    <audio id="audioPlayer"></audio>
-
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.0.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    
+    <div class="countdown-overlay" id="countdownOverlay">
+        <div class="countdown-number" id="countdownNumber">5</div>
+    </div>
 
     <script>
-        let video, canvas, ctx;
-        let detector;
-        let counting = false;
-        let counter = 0;
-        let audioPlayer = document.getElementById('audioPlayer');
-        let audioLoaded = false;
-        let audioDuration = 0;
-        let audioBlob = null;
-        
-        let lastRightAnkleY = null;
-        let lastLeftAnkleY = null;
-        let rightFootWasUp = false;
-        let detectionRunning = false;
-        
-        let timerInterval = null;
-        let startTime = null;
+        let selectedDuration = 30;
+        let jumpCount = 0;
+        let isRunning = false;
+        let isListening = false;
         let timeRemaining = 0;
+        let timerInterval = null;
+        let detectionInterval = null;
+        let lastJumpTime = 0;
+        const minJumpInterval = 200;
+        let jumpHistory = [];
+        let segmentJumps = [];
+        let currentSegmentStart = 0;
         
-        // 録画用
-        let mediaRecorder = null;
-        let recordedChunks = [];
-        let videoBlob = null;
+        let video, canvas, ctx;
+        let detector = null;
+        let isModelLoading = false;
+        let lastRightKneeY = null;
+        let isLanding = false;
+        let recognition = null;
         
-        const counterDisplay = document.getElementById('counterDisplay');
-        const counterValue = document.getElementById('counter');
-        const startBtn = document.getElementById('startBtn');
+        const modeBtns = document.querySelectorAll('.mode-btn');
         const stopBtn = document.getElementById('stopBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const cameraStatus = document.getElementById('cameraStatus');
-        const audioFile = document.getElementById('audioFile');
-        const fileName = document.getElementById('fileName');
-        const step3 = document.getElementById('step3');
-        const results = document.getElementById('results');
-        const finalCount = document.getElementById('finalCount');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const processing = document.getElementById('processing');
+        const statusEl = document.getElementById('status');
+        const timerEl = document.getElementById('timer');
+        const jumpCountEl = document.getElementById('jumpCount');
+        const resultsEl = document.getElementById('results');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const countdownNumber = document.getElementById('countdownNumber');
+        const voiceIndicator = document.getElementById('voiceIndicator');
         
-        // 音声ファイル読み込み
-        audioFile.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                fileName.textContent = file.name;
-                const url = URL.createObjectURL(file);
-                audioPlayer.src = url;
-                audioLoaded = true;
-                
-                // Blobとして保存
-                audioBlob = file;
-                
-                audioPlayer.addEventListener('loadedmetadata', () => {
-                    audioDuration = Math.floor(audioPlayer.duration);
-                    timeRemaining = audioDuration;
-                    step3.classList.remove('hidden');
-                });
-            }
+        video = document.getElementById('video');
+        canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d');
+        
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isRunning) return;
+                modeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedDuration = parseInt(btn.dataset.duration);
+                updateTimer(selectedDuration);
+                resultsEl.classList.remove('show');
+            });
         });
         
-        // カウント終了
-        function endCounting() {
-            counting = false;
-            audioPlayer.pause();
-            audioPlayer.currentTime = 0;
+        async function loadPoseDetectionModel() {
+            isModelLoading = true;
             
-            // 録画停止
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
+            try {
+                const detectorConfig = {
+                    modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+                    enableSmoothing: true
+                };
+                detector = await poseDetection.createDetector(
+                    poseDetection.SupportedModels.MoveNet, 
+                    detectorConfig
+                );
+                isModelLoading = false;
+                await initCamera();
+                await initVoiceRecognition();
+            } catch (err) {
+                console.error('モデル読み込みエラー:', err);
+                statusEl.innerHTML = '<div style="color: #f56565;">AIモデルの読み込みに失敗しました</div>';
+                isModelLoading = false;
             }
-            
-            startBtn.classList.remove('hidden');
-            stopBtn.classList.add('hidden');
-            
-            finalCount.textContent = counter;
-            results.classList.add('show');
         }
         
-        // Pose Detectionの初期化
-        async function initPoseDetection() {
+        async function initCamera() {
             try {
-                await tf.ready();
-                
-                const model = poseDetection.SupportedModels.MoveNet;
-                detector = await poseDetection.createDetector(model, {
-                    modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: 640, 
+                        height: 480,
+                        facingMode: 'user'
+                    } 
                 });
-                return true;
-            } catch (error) {
+                video.srcObject = stream;
+                
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        startPoseDetection();
+                        resolve(true);
+                    };
+                });
+            } catch (err) {
+                console.error('カメラアクセスエラー:', err);
+                statusEl.innerHTML = '<div style="color: #f56565;">カメラへのアクセスが必要です</div>';
+                alert('カメラへのアクセスを許可してください');
                 return false;
             }
         }
         
-        // カメラ初期化
-        async function initCamera() {
-            try {
-                video = document.getElementById('video');
-                canvas = document.getElementById('canvas');
-                ctx = canvas.getContext('2d');
+        function startPoseDetection() {
+            setInterval(async () => {
+                if (!detector) return;
                 
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'user',
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    },
-                    audio: false
-                });
-                video.srcObject = stream;
-                
-                await video.play();
-                
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                
-                const success = await initPoseDetection();
-                if (success) {
-                    detectionRunning = true;
-                    detectPose();
-                    cameraStatus.textContent = '✅ 準備OK！';
+                try {
+                    const poses = await detector.estimatePoses(video);
+                    
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    if (poses.length > 0) {
+                        const pose = poses[0];
+                        const keypoints = pose.keypoints;
+                        
+                        const rightKnee = keypoints.find(kp => kp.name === 'right_knee');
+                        const rightAnkle = keypoints.find(kp => kp.name === 'right_ankle');
+                        const rightHip = keypoints.find(kp => kp.name === 'right_hip');
+                        
+                        if (rightKnee && rightKnee.score > 0.3) {
+                            ctx.beginPath();
+                            ctx.arc(rightKnee.x, rightKnee.y, 10, 0, 2 * Math.PI);
+                            ctx.fillStyle = '#00ff00';
+                            ctx.fill();
+                            ctx.strokeStyle = '#00ff00';
+                            ctx.lineWidth = 3;
+                            ctx.stroke();
+                            
+                            if (rightHip && rightHip.score > 0.3) {
+                                ctx.beginPath();
+                                ctx.moveTo(rightHip.x, rightHip.y);
+                                ctx.lineTo(rightKnee.x, rightKnee.y);
+                                ctx.strokeStyle = '#00ff00';
+                                ctx.lineWidth = 5;
+                                ctx.stroke();
+                            }
+                            
+                            if (rightAnkle && rightAnkle.score > 0.3) {
+                                ctx.beginPath();
+                                ctx.moveTo(rightKnee.x, rightKnee.y);
+                                ctx.lineTo(rightAnkle.x, rightAnkle.y);
+                                ctx.strokeStyle = '#00ff00';
+                                ctx.lineWidth = 5;
+                                ctx.stroke();
+                            }
+                            
+                            if (isRunning && lastRightKneeY !== null) {
+                                const movement = rightKnee.y - lastRightKneeY;
+                                const now = Date.now();
+                                
+                                if (movement > 15 && !isLanding && (now - lastJumpTime) > minJumpInterval) {
+                                    isLanding = true;
+                                    registerJump();
+                                } else if (movement < -10) {
+                                    isLanding = false;
+                                }
+                            }
+                            
+                            lastRightKneeY = rightKnee.y;
+                        }
+                    }
+                } catch (err) {
+                    console.error('姿勢検出エラー:', err);
                 }
-            } catch (error) {
-                cameraStatus.textContent = '❌ カメラ起動失敗';
-                console.error(error);
-            }
+            }, 100);
         }
         
-        // 録画開始
-        function startRecording() {
-            recordedChunks = [];
+        async function initVoiceRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             
-            // canvasからストリームを取得
-            const canvasStream = canvas.captureStream(30);
+            if (!SpeechRecognition) {
+                statusEl.innerHTML = '<div style="color: #f56565;">音声認識に対応していないブラウザです</div>';
+                return;
+            }
             
-            mediaRecorder = new MediaRecorder(canvasStream, {
-                mimeType: 'video/webm;codecs=vp9',
-                videoBitsPerSecond: 2500000
-            });
+            recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.continuous = true;
+            recognition.interimResults = false;
             
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    recordedChunks.push(event.data);
+            recognition.onresult = (event) => {
+                const last = event.results.length - 1;
+                const text = event.results[last][0].transcript.trim();
+                
+                console.log('認識された音声:', text);
+                
+                if ((text.includes('スタート') || text.includes('start')) && !isRunning && isListening) {
+                    startSession();
                 }
             };
             
-            mediaRecorder.onstop = () => {
-                videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
-            };
-            
-            mediaRecorder.start();
-        }
-        
-        // 右足着地検知
-        function detectRightFootLanding(poses) {
-            if (!poses || poses.length === 0) return;
-            
-            const pose = poses[0];
-            const keypoints = pose.keypoints;
-            
-            const rightAnkle = keypoints.find(kp => kp.name === 'right_ankle');
-            const leftAnkle = keypoints.find(kp => kp.name === 'left_ankle');
-            
-            if (!rightAnkle || rightAnkle.score < 0.25) return;
-            if (!leftAnkle || leftAnkle.score < 0.25) return;
-            
-            const rightY = rightAnkle.y;
-            const leftY = leftAnkle.y;
-            
-            if (lastRightAnkleY !== null && lastLeftAnkleY !== null) {
-                if (rightY < leftY - 25) {
-                    rightFootWasUp = true;
-                }
-                
-                if (rightFootWasUp && rightY > lastRightAnkleY + 6 && rightY > leftY + 15) {
-                    rightFootWasUp = false;
-                    counter++;
-                    counterValue.textContent = counter;
-                    
-                    counterDisplay.classList.add('pulse');
-                    setTimeout(() => {
-                        counterDisplay.classList.remove('pulse');
-                    }, 200);
-                }
-            }
-            
-            lastRightAnkleY = rightY;
-            lastLeftAnkleY = leftY;
-        }
-        
-        // ポーズ描画
-        function drawPose(poses) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // ビデオを描画
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-            ctx.restore();
-            
-            if (!poses || poses.length === 0) return;
-            
-            const pose = poses[0];
-            const keypoints = pose.keypoints;
-            
-            const rightLeg = [
-                keypoints.find(kp => kp.name === 'right_hip'),
-                keypoints.find(kp => kp.name === 'right_knee'),
-                keypoints.find(kp => kp.name === 'right_ankle')
-            ];
-            
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.translate(-canvas.width, 0);
-            
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 3;
-            
-            for (let i = 0; i < rightLeg.length - 1; i++) {
-                if (rightLeg[i] && rightLeg[i + 1] && 
-                    rightLeg[i].score > 0.25 && rightLeg[i + 1].score > 0.25) {
-                    ctx.beginPath();
-                    ctx.moveTo(rightLeg[i].x, rightLeg[i].y);
-                    ctx.lineTo(rightLeg[i + 1].x, rightLeg[i + 1].y);
-                    ctx.stroke();
-                }
-            }
-            
-            rightLeg.forEach(kp => {
-                if (kp && kp.score > 0.25) {
-                    ctx.fillStyle = kp.name === 'right_ankle' ? '#ff0000' : '#00ff00';
-                    ctx.beginPath();
-                    ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
-                    ctx.fill();
-                }
-            });
-            
-            ctx.restore();
-        }
-        
-        // ポーズ検出ループ
-        async function detectPose() {
-            if (!detectionRunning || !detector) return;
-            
-            try {
-                const poses = await detector.estimatePoses(video);
-                drawPose(poses);
-                
-                if (counting) {
-                    detectRightFootLanding(poses);
-                    
-                    // タイマー確認
-                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    if (elapsed >= audioDuration) {
-                        endCounting();
+            recognition.onerror = (event) => {
+                console.error('音声認識エラー:', event.error);
+                if (event.error === 'no-speech') {
+                    if (isListening && !isRunning) {
+                        recognition.start();
                     }
                 }
-            } catch (error) {
-                console.error('検出エラー:', error);
-            }
+            };
             
-            requestAnimationFrame(detectPose);
+            recognition.onend = () => {
+                if (isListening && !isRunning) {
+                    recognition.start();
+                }
+            };
+            
+            try {
+                recognition.start();
+                isListening = true;
+                statusEl.textContent = '準備完了！「スタート」と言ってください';
+                voiceIndicator.style.display = 'inline-flex';
+            } catch (err) {
+                console.error('音声認識開始エラー:', err);
+            }
         }
         
-        // スタート
-        startBtn.addEventListener('click', () => {
-            if (!audioLoaded) {
-                alert('音源ファイルを選択してください！');
-                return;
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 1.0;
+            speechSynthesis.speak(utterance);
+        }
+        
+        function updateTimer(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        async function countdown() {
+            return new Promise((resolve) => {
+                let count = 5;
+                countdownOverlay.classList.add('show');
+                
+                const countInterval = setInterval(() => {
+                    countdownNumber.textContent = count;
+                    speak(count.toString());
+                    
+                    if (count === 1) {
+                        setTimeout(() => {
+                            clearInterval(countInterval);
+                            countdownOverlay.classList.remove('show');
+                            resolve();
+                        }, 1000);
+                    }
+                    count--;
+                }, 1000);
+            });
+        }
+        
+        function registerJump() {
+            jumpCount++;
+            jumpCountEl.textContent = jumpCount;
+            lastJumpTime = Date.now();
+            
+            jumpCountEl.style.transform = 'scale(1.2)';
+            setTimeout(() => {
+                jumpCountEl.style.transform = 'scale(1)';
+            }, 100);
+            
+            jumpHistory.push({
+                time: selectedDuration - timeRemaining,
+                count: jumpCount
+            });
+        }
+        
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimer(timeRemaining);
+                
+                const elapsed = selectedDuration - timeRemaining;
+                
+                if (timeRemaining === 10) {
+                    speak('10');
+                } else if (timeRemaining === 30 && selectedDuration === 180) {
+                    speak('20');
+                }
+                
+                if (elapsed > 0 && elapsed % 10 === 0) {
+                    const jumpsInSegment = jumpCount - currentSegmentStart;
+                    segmentJumps.push(jumpsInSegment);
+                    currentSegmentStart = jumpCount;
+                }
+                
+                if (timeRemaining <= 0) {
+                    endSession();
+                }
+            }, 1000);
+        }
+        
+        async function startSession() {
+            resultsEl.classList.remove('show');
+            jumpCount = 0;
+            jumpHistory = [];
+            segmentJumps = [];
+            currentSegmentStart = 0;
+            timeRemaining = selectedDuration;
+            jumpCountEl.textContent = '0';
+            updateTimer(timeRemaining);
+            lastRightKneeY = null;
+            isLanding = false;
+            
+            voiceIndicator.style.display = 'none';
+            stopBtn.disabled = false;
+            
+            const durationText = selectedDuration === 30 ? '30' : '3';
+            speak(`Starting the ${durationText} -second speed round.`);
+            statusEl.textContent = 'カウントダウン開始...';
+            
+            await countdown();
+            
+            speak('start!');
+            statusEl.textContent = '計測中... 📹 右足着地を検出中';
+            isRunning = true;
+            
+            startTimer();
+        }
+        
+        function endSession() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            
+            stopBtn.disabled = true;
+            
+            const finalJumps = jumpCount - currentSegmentStart;
+            if (finalJumps > 0) {
+                segmentJumps.push(finalJumps);
+            }
+            statusEl.textContent = '計測完了！もう一度「スタート」と言うと再開できます';
+            voiceIndicator.style.display = 'inline-flex';
+            
+            displayResults();
+        }
+        
+        function displayResults() {
+            const avgPace = (jumpCount / selectedDuration).toFixed(2);
+            const maxSegment = Math.max(...segmentJumps);
+            
+            document.getElementById('finalCount').textContent = jumpCount;
+            document.getElementById('avgPace').textContent = avgPace;
+            document.getElementById('maxPace').textContent = maxSegment;
+            
+            const barChart = document.getElementById('barChart');
+            barChart.innerHTML = '';
+            
+            const maxHeight = Math.max(...segmentJumps);
+            
+            segmentJumps.forEach((jumps, index) => {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                const heightPercent = maxHeight > 0 ? (jumps / maxHeight) * 100 : 0;
+                
+                setTimeout(() => {
+                    bar.style.height = `${heightPercent}%`;
+                }, index * 100);
+                
+                const label = document.createElement('div');
+                label.className = 'bar-label';
+                label.textContent = `${(index + 1) * 10}秒`;
+                
+                const value = document.createElement('div');
+                value.className = 'bar-value';
+                value.textContent = jumps;
+                
+                bar.appendChild(label);
+                bar.appendChild(value);
+                barChart.appendChild(bar);
+            });
+            
+            generateAIAdvice(avgPace, maxSegment, segmentJumps);
+            
+            setTimeout(() => {
+                resultsEl.classList.add('show');
+            }, 300);
+        }
+        
+        function generateAIAdvice(avgPace, maxSegment, segments) {
+            let advice = '';
+            
+            if (avgPace >= 5.0) {
+                advice = `素晴らしいペースです！平均${avgPace}回/秒は非常に高いレベルです。`;
+            } else if (avgPace >= 4.0) {
+                advice = `良好なペースです！平均${avgPace}回/秒を維持できています。`;
+            } else if (avgPace >= 3.0) {
+                advice = `平均${avgPace}回/秒のペースです。さらなる向上を目指しましょう！`;
+            } else {
+                advice = `平均${avgPace}回/秒です。練習を重ねてペースアップを目指しましょう。`;
             }
             
-            counting = true;
-            results.classList.remove('show');
-            startBtn.classList.add('hidden');
-            stopBtn.classList.remove('hidden');
+            const firstHalf = segments.slice(0, Math.floor(segments.length / 2));
+            const secondHalf = segments.slice(Math.floor(segments.length / 2));
+            const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+            const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
             
-            lastRightAnkleY = null;
-            lastLeftAnkleY = null;
-            rightFootWasUp = false;
+            if (secondAvg > firstAvg * 1.1) {
+                advice += ' 後半にペースアップできています。スタミナが十分にあるので、前半からもう少し攻めても良いかもしれません。';
+            } else if (firstAvg > secondAvg * 1.2) {
+                advice += ' 前半のペースが速く、後半にペースダウンしています。持久力の強化やペース配分の見直しをおすすめします。';
+            } else {
+                advice += ' 安定したペースで跳べています。このリズムを維持しながら、全体のスピードアップを目指しましょう。';
+            }
             
-            startTime = Date.now();
+            const variance = segments.reduce((sum, val) => {
+                const diff = val - (jumpCount / segments.length);
+                return sum + diff * diff;
+            }, 0) / segments.length;
             
-            audioPlayer.currentTime = 0;
-            audioPlayer.play();
+            if (variance < 5) {
+                advice += ' ペースが非常に安定しています。次はスピードアップにチャレンジしてみましょう！';
+            }
             
-            startRecording();
-        });
+            document.getElementById('aiAdvice').textContent = advice;
+        }
         
-        // ストップ
         stopBtn.addEventListener('click', () => {
-            endCounting();
-        });
-        
-        // リセット
-        resetBtn.addEventListener('click', () => {
-            counter = 0;
-            counterValue.textContent = '0';
-            lastRightAnkleY = null;
-            lastLeftAnkleY = null;
-            rightFootWasUp = false;
-            results.classList.remove('show');
-            videoBlob = null;
-        });
-        
-        // 動画ダウンロード（音声なし版）
-        downloadBtn.addEventListener('click', () => {
-            if (!videoBlob) {
-                alert('動画が録画されていません');
-                return;
+            if (confirm('計測を中止しますか？')) {
+                endSession();
             }
-            
-            processing.classList.remove('hidden');
-            
-            // 簡易版：音声合成なしでダウンロード
-            const url = URL.createObjectURL(videoBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `jump_counter_${Date.now()}.webm`;
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            processing.classList.add('hidden');
-            alert('動画をダウンロードしました！（注：音声なし版）');
         });
         
-        // 初期化
-        initCamera();
+        updateTimer(selectedDuration);
+        loadPoseDetectionModel();
     </script>
 </body>
 </html>
