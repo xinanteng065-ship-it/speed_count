@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Jump Coach</title>
+    <title>Speed Count</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <style>
@@ -118,29 +118,6 @@
             min-height: 30px;
         }
         
-        .voice-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 20px;
-            background: #f7fafc;
-            border-radius: 10px;
-            margin: 20px auto;
-        }
-        
-        .mic-icon {
-            width: 20px;
-            height: 20px;
-            background: #48bb78;
-            border-radius: 50%;
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.8); }
-        }
-        
         .controls {
             display: flex;
             gap: 15px;
@@ -156,6 +133,16 @@
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
+        }
+        
+        .start-btn {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .start-btn:hover:not(:disabled) {
+            background: #38a169;
+            transform: translateY(-2px);
         }
         
         .stop-btn {
@@ -188,21 +175,6 @@
         .results h2 {
             color: #667eea;
             margin-bottom: 15px;
-        }
-        
-        .result-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            margin: 5px 0;
-            background: white;
-            border-radius: 5px;
-            font-size: 1.1em;
-        }
-        
-        .result-value {
-            font-weight: bold;
-            color: #667eea;
         }
         
         .countdown-overlay {
@@ -382,7 +354,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏃‍♂️ AI Jump Coach</h1>
+        <h1>Speed Count</h1>
         
         <div class="mode-selector">
             <button class="mode-btn active" data-duration="30">30秒スピード</button>
@@ -396,17 +368,14 @@
         
         <div class="display-area">
             <div class="status" id="status">
-                <div class="loading">読み込み中...</div>
-            </div>
-            <div class="voice-indicator" id="voiceIndicator" style="display: none;">
-                <div class="mic-icon"></div>
-                <span>「スタート」と言ってください</span>
+                <div class="loading">AIモデルを読み込み中...</div>
             </div>
             <div class="timer" id="timer">00:00</div>
             <div class="jump-count" id="jumpCount">0</div>
         </div>
         
         <div class="controls">
+            <button class="control-btn start-btn" id="startBtn" disabled>スタート</button>
             <button class="control-btn stop-btn" id="stopBtn" disabled>ストップ</button>
         </div>
         
@@ -434,7 +403,7 @@
             </div>
             
             <div class="ai-advice">
-                <h3>🤖 アドバイス</h3>
+                <h3>🤖 AIアドバイス</h3>
                 <p id="aiAdvice">計測を完了すると、パフォーマンス分析とアドバイスが表示されます。</p>
             </div>
         </div>
@@ -448,10 +417,8 @@
         let selectedDuration = 30;
         let jumpCount = 0;
         let isRunning = false;
-        let isListening = false;
         let timeRemaining = 0;
         let timerInterval = null;
-        let detectionInterval = null;
         let lastJumpTime = 0;
         const minJumpInterval = 200;
         let jumpHistory = [];
@@ -463,9 +430,9 @@
         let isModelLoading = false;
         let lastRightKneeY = null;
         let isLanding = false;
-        let recognition = null;
         
         const modeBtns = document.querySelectorAll('.mode-btn');
+        const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
         const statusEl = document.getElementById('status');
         const timerEl = document.getElementById('timer');
@@ -473,7 +440,6 @@
         const resultsEl = document.getElementById('results');
         const countdownOverlay = document.getElementById('countdownOverlay');
         const countdownNumber = document.getElementById('countdownNumber');
-        const voiceIndicator = document.getElementById('voiceIndicator');
         
         video = document.getElementById('video');
         canvas = document.getElementById('canvas');
@@ -504,7 +470,6 @@
                 );
                 isModelLoading = false;
                 await initCamera();
-                await initVoiceRecognition();
             } catch (err) {
                 console.error('モデル読み込みエラー:', err);
                 statusEl.innerHTML = '<div style="color: #f56565;">AIモデルの読み込みに失敗しました</div>';
@@ -528,6 +493,8 @@
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
                         startPoseDetection();
+                        statusEl.textContent = '準備完了！スタートボタンを押してください';
+                        startBtn.disabled = false;
                         resolve(true);
                     };
                 });
@@ -604,58 +571,9 @@
             }, 100);
         }
         
-        async function initVoiceRecognition() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            
-            if (!SpeechRecognition) {
-                statusEl.innerHTML = '<div style="color: #f56565;">音声認識に対応していないブラウザです</div>';
-                return;
-            }
-            
-            recognition = new SpeechRecognition();
-            recognition.lang = 'en-US';
-            recognition.continuous = true;
-            recognition.interimResults = false;
-            
-            recognition.onresult = (event) => {
-                const last = event.results.length - 1;
-                const text = event.results[last][0].transcript.trim();
-                
-                console.log('認識された音声:', text);
-                
-                if ((text.includes('スタート') || text.includes('start')) && !isRunning && isListening) {
-                    startSession();
-                }
-            };
-            
-            recognition.onerror = (event) => {
-                console.error('音声認識エラー:', event.error);
-                if (event.error === 'no-speech') {
-                    if (isListening && !isRunning) {
-                        recognition.start();
-                    }
-                }
-            };
-            
-            recognition.onend = () => {
-                if (isListening && !isRunning) {
-                    recognition.start();
-                }
-            };
-            
-            try {
-                recognition.start();
-                isListening = true;
-                statusEl.textContent = '準備完了！「スタート」と言ってください';
-                voiceIndicator.style.display = 'inline-flex';
-            } catch (err) {
-                console.error('音声認識開始エラー:', err);
-            }
-        }
-        
         function speak(text) {
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US';
+            utterance.lang = 'ja-JP';
             utterance.rate = 1.0;
             speechSynthesis.speak(utterance);
         }
@@ -710,12 +628,6 @@
                 
                 const elapsed = selectedDuration - timeRemaining;
                 
-                if (timeRemaining === 10) {
-                    speak('10');
-                } else if (timeRemaining === 30 && selectedDuration === 180) {
-                    speak('20');
-                }
-                
                 if (elapsed > 0 && elapsed % 10 === 0) {
                     const jumpsInSegment = jumpCount - currentSegmentStart;
                     segmentJumps.push(jumpsInSegment);
@@ -740,16 +652,14 @@
             lastRightKneeY = null;
             isLanding = false;
             
-            voiceIndicator.style.display = 'none';
+            startBtn.disabled = true;
             stopBtn.disabled = false;
             
-            const durationText = selectedDuration === 30 ? '30' : '3';
-            speak(`Starting the ${durationText} -second speed round.`);
+            const durationText = selectedDuration === 30 ? '30秒' : '3分';
             statusEl.textContent = 'カウントダウン開始...';
             
             await countdown();
             
-            speak('start!');
             statusEl.textContent = '計測中... 📹 右足着地を検出中';
             isRunning = true;
             
@@ -760,14 +670,16 @@
             isRunning = false;
             clearInterval(timerInterval);
             
+            startBtn.disabled = false;
             stopBtn.disabled = true;
             
             const finalJumps = jumpCount - currentSegmentStart;
             if (finalJumps > 0) {
                 segmentJumps.push(finalJumps);
             }
-            statusEl.textContent = '計測完了！もう一度「スタート」と言うと再開できます';
-            voiceIndicator.style.display = 'inline-flex';
+            
+            speak(`終了です。${jumpCount}回跳びました。`);
+            statusEl.textContent = '計測完了！';
             
             displayResults();
         }
@@ -851,6 +763,8 @@
             
             document.getElementById('aiAdvice').textContent = advice;
         }
+        
+        startBtn.addEventListener('click', startSession);
         
         stopBtn.addEventListener('click', () => {
             if (confirm('計測を中止しますか？')) {
